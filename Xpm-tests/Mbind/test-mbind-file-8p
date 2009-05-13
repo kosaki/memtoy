@@ -1,0 +1,15 @@
+# memtoy test - 8p region of single file seg
+# requires ./zerofile-1m
+# 
+#numa
+file zerofile-1m
+map zerofile-1m
+mbind zerofile-1m preferred 1
+touch zerofile-1m w
+where zerofile-1m
+#numa
+#pause
+# move 8 pages at offset 8 pages
+mbind zerofile-1m 8p 8p bind+move 2
+where zerofile-1m
+#numa

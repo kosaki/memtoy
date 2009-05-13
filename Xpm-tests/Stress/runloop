@@ -1,0 +1,192 @@
+#!/usr/bin/ksh
+
+## runloop [-l <# of loops>] <memtoy-script>
+##
+## Memtoy wrapper to automate looping of a script
+##
+
+: ${NOEXEC:=false}
+: ${VERBOSE:=false}
+: ${MEMTOY:=memtoy}
+
+: ${DFLT_NR_LOOPS:=10}
+
+_CMD=${0##*/}		# basename of $0
+OPTIONS=":nvhxl:"
+USAGE="\
+usage:  $_CMD [-nvhx] [-l <# of loops>]  <memtoy-script>\n\
+Where:\n\
+\t-n       = no execute.  show what would happen [implies verbose]\n\
+\t-v       = verbose.  tell me what's happening\n\
+\t-x/-h    = eXplain [aka help].  You'll also see the usage if you have\n\
+\t           any errors in the options or arguments.\n\n\
+\t-l <# of loops> specifies # of times to loop the memtoy script.\n\
+\t           default = $DFLT_NR_LOOPS\n\n\
+<memtoy-script> specifies the path to a memtoy script that will be fed to\n\
+memtoy's standard input via a pipe.  Lines in the script up to the first\n\
+occurrence of the line '#loop' will be fed to memtoy once as initialization.\n\
+Subsequent lines will be sent to memtoy <# of loops> times.\n\n\
+"
+
+typeset -i nr_loops=$DFLT_NR_LOOPS
+typeset script=
+typeset command[0]="quit"
+
+# =============================================================================
+# die <exit-code> <message> -- issue error message and exit w/ exit-code:
+die() {
+	typeset _rc=$1; shift
+
+	echo -e "$@" >&2
+	exit $_rc
+}
+
+# =============================================================================
+# usage <exit-code> [<message>] -- issue error message if specified,
+#				 display usage message, and exit w/ exit-code
+usage()
+{
+	typeset _rc=${1:-0}
+	[ -z "$*" ] || { shift; echo -e "$@" >&2; }
+	echo -e "$USAGE"
+	exit $_rc
+}
+
+# =============================================================================
+# vprint -- print args if verbosity enabled
+vprint()
+{
+	$VERBOSE || return
+	echo -e "$@" >&2
+}
+
+# =============================================================================
+# is_command <line> -- true if <line> is not a comment nor empty
+is_command()
+{
+	typeset line="$1"
+	if [[ ${#line} -eq 0 || $( expr "$line" : '[ 	]*#') -ne 0 ]]
+	then
+		return 1
+	fi
+	return 0
+}
+
+# =============================================================================
+#is_loop <line> -- true if <line> contains the "#loop" comment
+is_loop()
+{
+	typeset line="$1"
+	if [[ $(expr "$line" : '[ 	]*#[ 	]*loop') -eq 0 ]]
+	then
+		return 1	# no
+	fi
+	return 0	# yes
+}
+
+# =============================================================================
+#is_quit <line> -- true if <line> contains the "quit" or "exit" command
+is_quit()
+{
+	typeset line="$1"
+	if [[ $(expr "$line" : '[ 	]*q') -eq 0 && \
+	      $(expr "$line" : '[ 	]*e') -eq 0 ]]
+	then
+		return 1	# no
+	fi
+	return 0	# yes
+}
+
+# =============================================================================
+# main()
+
+# process command line options:
+while getopts $OPTIONS opt
+do
+	case $opt in
+	n)	NOEXEC=true VERBOSE=true
+		;;
+	v)	VERBOSE=true
+		;;
+	x)	usage
+		;;
+
+	l)	nr_loops=$OPTARG;
+		;;
+	\?)	usage 1 "Unrecognized option $OPTARG"
+		;;
+	\:)	usage 1 "Option $OPTARG requires an argument"
+		;;
+	esac
+done
+
+## shift past any options to arguments:
+shift `expr $OPTIND - 1`
+
+[[ -n "$1" ]] || usage 2 "Need a <memtoy-script> to run"
+script=$1
+[[ -r $script ]] || die 3 "Can't read script $script"
+
+typeset -i icmd=0 iloop=0
+typeset found_loop=false
+typeset memtoy_verbose=
+
+if $VERBOSE
+then
+	memtoy_verbose='-v'
+fi
+
+cat $script |
+while true
+do
+	# do this entirely in a single while loop because we can't
+	# populate an array in a "while read" loop and have the
+	# contents of the array visible outside the loop.  A GNU-ism...
+	if read line
+	then
+		if $found_loop
+		then
+			if is_command "$line"
+			then
+				if is_quit "$line"
+				then
+					continue	# filter quit/exit
+				fi
+				command[icmd]="$line"
+				icmd=$(( icmd + 1 ))
+			fi
+			continue
+		fi
+		if is_command "$line"
+		then
+			if is_quit "$line"
+			then
+				continue	# filter quit/exit
+			fi
+			echo "$line" # forward to memtoy
+			continue
+		elif is_loop "$line"
+		then
+			found_loop=true
+		fi
+		continue
+	fi
+	vprint "done reading commands" >&2
+
+	# Now, we've collected all of the loop commands in the command array.
+	iloop=0
+	while [[ $iloop -lt $nr_loops ]]
+	do
+		#vprint "loop $iloop"
+		icmd=0
+		while [[ $icmd -lt ${#command[*]} ]]
+		do
+			echo "${command[$icmd]}"
+			icmd=$(( icmd + 1 ))
+		done
+		iloop=$(( iloop + 1 ))
+	done
+	break
+done | \
+exec ${MEMTOY} $memtoy_verbose
+

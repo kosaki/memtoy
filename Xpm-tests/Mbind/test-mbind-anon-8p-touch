@@ -1,0 +1,18 @@
+# memtoy test - lazy migrate single 8 page anon segment
+# 
+#numa
+anon foo 8p
+map foo
+mbind foo preferred 1
+touch foo w
+where foo
+touch foo r
+#numa
+#pause
+# lazy mig -- no wait
+mbind foo 0 8p bind+move 2
+where foo
+# touch pages to fault entire segment
+touch foo r
+# read pages to migrate on fault
+#numa

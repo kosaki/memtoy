@@ -1,0 +1,14 @@
+# memtoy test  - migrate single 1 page anon segment
+# for debug/testing
+# 
+#numa
+anon foo 1p
+map foo
+mbind foo preferred 1
+touch foo w
+where foo
+#numa
+#pause
+mbind foo 0 1p bind+move 2
+where foo
+#numa

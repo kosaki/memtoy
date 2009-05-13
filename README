@@ -1,0 +1,395 @@
+Memtoy  - a toy [tool] for performing various memory
+operations [mapping, protection, faulting] for investigating
+vm behavior.
+
+Memtoy started out as a set of small, ad hoc C test programs developed
+by Ray Bryant, et al of SGI for testing early versions of Linux memory
+migration.  These tests included pieces of other works, such as linux
+headers, ...  Memtoy evolved to obviate continual hacking and rebuilding
+of ad hoc C programs to test different memory policy and migration
+scenarios.  Admittedly, a fair amount of odd hacking and rebuilding has
+gone into memtoy.  Very little of the original test code remains, but
+memtoy still uses some local copies of linux headers.  No copyrights
+were removed, and no puppies were injured in the making of memtoy.
+
+N.B., migrate command depends on Christoph Lameter's "direct memory migration"
+      patches.   Available in upstream kernels since 2.6.16 and in distros
+      based on those kernels--e.g., SLES10, RHEL5
+
+      Also, the 'noop' policy and '+lazy' flag to mbind() requires
+      migrate-on-fault kernel patches [from <lee.schermerhorn@hp.com>]
+
+      For other "dependencies" see the version history at the end.
+
+=====================================================================
+Building:   
+
+Read the Makefile.  You may need to edit it, depending on the distro
+environment on which you are compiling.  Some things to consider:
+
+memtoy [commands & segment components] depends on <numa.h> and <numaif.h>.
+The executable depends on libnuma.  [-lnuma => /usr/lib/libnuma.so]
+These [probably] reside in the numactl-devel package.  For RHEL5, this
+package resides on the install DVD or one of the install CDROMs.
+For SLES10, it probably resides on the SLES10 SDK cd.
+Other distros: ???
+
+memtoy also depends on the gnu readline and history command line
+editting feature.  These are included in the readline-devel-* package.
+The readline/history feature itself depends on the ncurses libraries,
+found in the ncurses-devel-* package.
+
+The migrate_pages.[co] stub is only needed until the migrate_pages()
+syscall shows up in libnuma.  This is the case for RHEL5 [and SLES10?].
+migrate_pages.o depends on <linux/sys.h> on RHEL4/SLES9 and on 
+<sys/syscall.h> on RHEL5 [and SLES10?] to determine whether or not
+the migrate_pages() system call exists.  On the later distros, you 
+could probably just remove migrate_pages.o from the EXTRAOBJS macro
+and be done with it [untested].
+
+migrate_pages.h defines MPOL_MF_* flags required by memtoy that are
+not defined in the <numa*.h> headers--e.g., MPOL_MF_LAZY for lazy
+page migration.  We will continue to need this header to build
+memtoy until lazy migration is merged and available, or until we
+give up on it and rip support for it out of memtoy.
+
+memtoy can be built and run on a non-numa platform as long as the
+necessary headers are available [<numa.h> and <numaif.h>].  A copy
+of these headers from the numactl source package resides in the
+./include directory.  numa_stubs.c contains function stubs for the
+libnuma functions used by memtoy.  "make NUMA=no" should build
+memtoy for testing on a platform/distro without libnuma or the 
+associated headers.  All numa features will be disabled.
+
+Note:  "migrate_pages" is misspelled "migratepages" in the RHEL5 
+<numaif.h> from the numactl-devel package.  The name of the function
+entry point in libnuma.so is "migrate_pages".  ./commands.c contains
+a hack to "#define migratepage migrate_pages" before including 
+<numaif.h>.
+
+=====================================================================
+Usage:  memtoy [-v] [-V] [-{h|x}] [<script-file>]
+
+Where:
+	-v            enable verbosity
+	-V            display version info
+	-h|x          show this usage/help message
+
+memtoy can be run interactively or in batch mode.  If <script-file>
+is specified on the command line, memtoy runs in batch mode.
+Otherwise, it will run in interactive mode.
+In interactive mode, use 'help' for a list of commands, and 'help <command>'
+for more info about a specific command.
+
+Can also:  echo help [<command>] | memtoy
+
+------------------------------------
+
+Supported commands [augmented help]:
+
+quit           - just what you think
+	EOF on stdin has the same effect
+
+exit - alias for 'quit'
+
+help           - show this help
+help <command> - display help for just <command>
+
+pid            - show process id of this session
+
+pause          - pause program until signal -- e.g., INT, USR1
+
+numa          - display numa info as seen by this program.
+	shows nodes from which program may allocate memory
+	with total and free memory.
+
+migrate <to-node-id[s]> [<from-node-id[s]>] - 
+	migrate this process' memory from <from-node-id[s]>
+	to <to-node-id[s]>.
+	Specify multiple node ids as a comma-separated list.
+	If <from-node-id[s]> is omitted, it defaults to memtoy's
+	current set of allowed nodes.
+
+show [<name>]  - show info for segment[s]; default all
+	If <seg-name> == [or starts with] '+', show the segments from
+	the task's maps [/proc/<mypid>/maps] -- otherwise, not.
+	Note:  the <seg-name> of a "file" segment is the "basename"
+	       of the file's <pathname>.
+
+anon <seg-name> <seg-size>[k|m|g|p] [<seg-share>] -
+	define a MAP_ANONYMOUS segment of specified size
+	<seg-name> must be unique.
+	<seg-share> := private|shared - default = private
+
+file <pathname> [<offset>[k|m|g|p] <length>[k|m|g|p]] [<seg-share>] -
+	define a mapped file segment of specified length starting at the
+	specified offset into the file. 
+	Use the "basename" of <pathname> for <seg-name> with commands
+	that require one.  Therefore, the file's basename must not
+	<offset> and <length> may be omitted and specified on the map
+	command.
+	<seg-share> := private|shared - default = private
+
+shmem <seg-name> <seg-size>[k|m|g|p] - 
+	define a shared memory segment of specified size.
+	<seg-name> must be unique.
+	You may need to increase limits [/proc/sys/kernel/shmmax].
+	Use map/unmap to attach/detach
+
+remove <seg-name> [<seg-name> ...] - remove the named segment[s]
+
+map <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]] [<seg-share>] - 
+	mmap()/shmat() a previously defined, currently unmapped() segment.
+	<offset> and <length> apply only to mapped files.
+	Use <length> of '*' or '0' to map to the end of the file.
+	Offset and length specified here override those specified on
+	the file command.
+
+unmap <seg-name> - unmap specified segment, but remember name/size/...
+	You can't unmap segments from the task's /proc/<pid>/maps.
+
+lock <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]] - 
+	mlock() a [range of a] previously mapped segment.
+	Lock the named segment from <offset> through <offset>+<length>
+	into memory.  If <offset> and <length> omitted, locks all pages
+	of mapped segment.  Locking a range of a segment causes the pages
+	backing the specified/implied range to be faulted into memory.
+	NOTE:  locking is restricted by resource limits for non-privileged
+	users.  See 'ulimit -l' -- results in Kbytes.
+
+
+unlock <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]] - 
+	munlock() a [range of a] previously mapped segment.
+	Unlock the named segment from <offset> through <offset>+<length>.
+	If <offset> and <length> omitted, unlocks all pages of segment.
+
+slock <shm-seg-name> - 
+	SHM_LOCK a previously mapped shmem segment into memory.
+	SHM_LOCK will not automatically fault the pages of the segment
+	into memory.  Use the "touch" command to fault in the segment
+	after locking, if necessary.
+	NOTE:  locking is restricted by resource limits for non-privileged
+	users.  See 'ulimit -l' -- results in Kbytes.
+
+sunlock <shm-seg-name> - 
+	SHM_UNLOCK a previously SHM_LOCKed shmem segment.
+
+mbind <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]]
+      <policy>[+shared][+move[+all][+lazy]] [<node/list>] - 
+	set the numa policy for the specified range of the named segment
+	to policy --  one of {default, bind, preferred, interleaved, noop}.
+	<node/list> specifies a node id or a comma separated list of
+	node ids.  <node/list> is ignored for 'default' policy, and
+	only the first node is used for 'preferred' policy.
+	'+shared' apply shared policy to shared, file mapping.  This flag must
+	         come before '+move', if specified.  Current uid must be owner
+	        of the file and shared_file_policy must be enabled in memtoy's
+	        cpuset.
+	'+move' specifies that currently allocated pages be moved, if
+	        necessary/possible, to satisfy policy.  Pages can't be
+	        moved if they are mapped by more than one process.
+	'+all' [valid only with +move] specifies that all eligible pages
+	        in task be moved to satisfy policy, even if they are
+	        mapped by more than one process.  Requires appropriate
+	        privilege.
+	'+lazy' [valid only with +move] requests that mbind just unmap the
+	        pages in the specified range after setting the new policy.
+	        Page migration will then occur when the task touches the pages
+	        to fault them back into its page table.
+	For policies preferred and interleaved, <node/list> may be specified
+	as '*' meaning local allocation for preferred policy and "all allowed
+	nodes" for interleave policy.
+
+touch <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]] [read|write]
+	read [default] or write the named segment from <offset> through
+	<offset>+<length>.  If <offset> and <length> omitted, touches all
+	 of mapped segment.
+	You can't write to segments from the task's /proc/<pid>/maps.
+
+where <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]] - 
+	show the node location of pages in the specified range
+	of the specified segment.  <offset> defaults to start of
+	segment; <length> defaults to 64 pages.
+	Use SIGINT to interrupt a long display.
+
+cpus [{0x<mask>|<cpu-list>}] -	query/change program's cpu affinity mask.
+
+        Specify allowed cpus as a comma separated list of cpu masks:
+        0x<mask>, where <mask> consists entirely of hex digits, high
+        order bits first, or as a comma separated list of decimal
+        cpu ids.
+
+mems [{0x<mask>|<node-list>}] -	query/change program's memory affinity mask.
+
+	Specify allowed memories [nodes] as 0x<mask>, where <mask>
+	consists entirely of hex digits, or as a comma separated list
+	of decimal memory/node ids
+
+child <child-name> -    create a child process named <child-name>.
+	child enters command loop, reading from pipe.
+	Commands prefixed with '/<child-name>' will be sent to the
+	child process.  Use '/' by itself, or '/?' to list existing
+	children.  Note that children may also have children of
+	their own and commands may be sent to 'grandchildren'
+	via '/<child>/<grandchild>[/...] <command> ...
+
+kick <child> [<signal>] - post <signal> to <child>
+	<signal> may be entered by number or name.
+	Use 'kick ?' to see the list of signal names
+	that memtoy recognizes
+
+Note:  to recognize the optional offset and length args, they must
+start with a digit.  This is required anyway because the strings are
+converted using strtoul() with a zero 'base' argument.  So, hex args
+must always start with '0x'...
+
+===================================================================
+Versions:
+
+up thru version 0.5*:
+	migrate command assumed Ray Bryant's manual page migration
+	migrate_pages() sys call.
+
+	mbind command assumed prototype "lazy page migration" layered
+	on manual page migration:  
+
+	mbind <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]]
+	      <policy>[+move[+wait]] [<node/list>] - 
+	set the numa policy for the specified range of the name segment
+	to policy --  one of {default, bind, preferred, interleaved}.
+	<node/list> specifies a node id or a comma separated list of
+	node ids.  <node> is ignored for 'default' policy, and only
+	the first node is used for 'preferred' policy
+	'+move' specifies that currently allocated pages be prepared
+		for migration on next touch
+	'+wait' [valid only with +move] specifies that pages mbind()
+	  touch the pages and wait for migration before returning.
+
+	'move' => MPOL_MF_MOVE flag - always "lazy"
+	'wait' => MPOL_MF_WAIT flag
+
+starting with version 0.6, move to Christoph Lameter's new migration
+implementation [2.6.16-rc1...]:
+
+v0.6a
+	'move' => MPOL_MF_MOVE flag - "eager migration" == migrate
+	[range] now.  Pages that are only mapped by this instance
+	of memtoy can be migrated.
+	'move'+'all' => MPOL_MF_MOVE_ALL flag - eager migration -
+	try to move pages mapped by > 1 process/mm/vma.
+
+v0.6b
+	fix build errors on SLES* discovered by Christoph:  nix inclusion
+	of <linux/list.h>; add missing '=' in command table initialization.
+
+	added support for <script-file> name on command line.
+
+	fix up interpretation of MPOL_MF_MOVE_ALL in mbind.
+
+	preload segment table with segments from task's /proc/<pid>/maps:
+		stack, heap, executable image's text and data,
+		mapped libraries' text and data.
+	HACK:  because of segment name uniqueness requirement, only one
+		of any mapped libraries' text and/or data segments is
+		included in the table.  This should be sufficient for
+		testing migration of test segments.
+	NOTE:  segments preloaded from '/maps can't be unmapped nor
+		written to via 'touch <seg-name> w'
+
+	fix up help text and usage to match these changes.
+
+v0.6c
+	use readline()/add_history() for command line editing in
+	interactive mode.
+
+	modified memtoy.c:vprint() [verbose print] to use stdout, instead
+	of stderr to correctly interleave redirected output.
+
+v0.6d =
+v0.7
+	add 'lazy' flag to mbind command for testing migrate-on-fault.
+
+v0.8
+	add MPOL_NOOP for testing that proposal.
+	add 'cpus' command to query/change cpu affinity.
+	add 'mems' command to query/change mems_allowed.
+
+v0.9
+	start adding support for > 64 cpus.
+	needs testing with same.
+	see MAX_CPUID in memtoy.h;  cpus() and show_cpus() in
+	commands.c
+
+v0.9a/b
+	add lock/unlock commands
+
+V0.10
+	hack 'cpus' command and helper functions to support > 64 cpus
+	via hex masks.  Use 32-bit masks so for compatibility with
+	32-bit systems.
+
+V0.10a
+	add more verbosity when requested:
+		munmap(), ...
+
+V0.10b
+	enhance error messages from mems, cpus
+
+	enhance Makefile so that commands.o and segement.o depend
+	on numa[if].h header.  Will generate more meaningful errors
+	when headers are missing.
+
+	modify migrate_pages.c stub to include <sys/syscall.h>
+	instead of <linux/sys.h>.  Works for RHEL5 build.
+	Modify Makefile dependency.
+
+	NOTE:  don't really need to build/link migrate_pages.* for
+	RHEL5/SLES10 because migrate_pages(2) now in libnuma.
+
+V0.10c
+	fix build against RHEL 5's <numaif.h> from numactl-devel
+	package.  In that header, "migrate_pages" is misspelled as
+	"migratepages" resulting in undefined symbol on link.  The
+	function is named "migrate_pages" in libnuma.so.
+
+V0.11
+	rename 'shm' -> 'shmem'.  'shm' still works as abbrev.
+
+	Add optional huge flag to shm[em] command to use hugepages.
+
+V0.11a
+	Display segment location [where command] in terms of segment pagesize.
+	Had to add support for per segment pagesize, and fetch huge_pagesize
+	from /proc/meminfo.
+
+V0.11b
+	Fix "touch memory" to use segment page size [base or huge].
+
+V0.12
+	Add support for '*' nodelist specification to mbind command for
+	interleave and preferred policies.  '*' means "all available
+	nodes".  Passes null nodemask to mbind().
+
+V0.13
+	Add support for experimental "MPOL_F_MEMS_ALLOWED get_mempolicy()
+	flag.  Requires kernel support.  See _USE_MPOL_F_MEMS_ALLOWED
+	in DEFS macro in Makefile, and usage in commands.c
+
+V0.14
+	Add support for expermental "MPOL_MF_SHARED" flag.  Require this
+	flag to install shared policy on shared, file backed mapping in
+	attempt to address concerns about this semantic suddenly working
+	with older programs that don't expect it.
+	Fix return value of remove_seg() [remove command]--i.e., add return
+	in case of success.
+
+V0.15
+	Fix up build on non-numa platforms.  Include numa headers from
+	numactl source package in ./include.  Clean up numa_stubs.c to 
+	build with latest numa headers.
+
+	Add slock/sunlock commands to SHM_LOCK/SHM_UNLOCK shmem segments.
+V0.16
+	Add "snooze" command [sleep for specified interval]
+
+	Add "mpol" -- set/query task policy

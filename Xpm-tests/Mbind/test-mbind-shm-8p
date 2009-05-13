@@ -1,0 +1,13 @@
+# memtoy test - migrate 8p range of single 1M shm seg
+# 
+numa
+shm foo 1m
+map foo
+mbind foo preferred 1
+touch foo w
+where foo 0 32p
+numa
+#pause
+mbind foo 8p 8p bind+move 2
+where foo 0 32p
+#numa

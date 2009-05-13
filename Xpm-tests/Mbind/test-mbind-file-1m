@@ -1,0 +1,14 @@
+# memtoy test - migration of entire 1M mapped file
+# requires ./zerofile-1m
+# 
+numa
+file zerofile-1m
+map zerofile-1m
+mbind zerofile-1m preferred 1
+touch zerofile-1m w
+where zerofile-1m
+numa
+#pause
+mbind zerofile-1m bind+move 2
+where zerofile-1m
+numa

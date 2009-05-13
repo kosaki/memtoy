@@ -1,0 +1,56 @@
+#!/bin/bash
+
+## mkzf -- make a zero file using dd for memtoy shared file testing
+
+USAGE="\
+Usage:  mkzf [<name> [<size_mb>]] - make a zero file of size <size_mb>\n\n\
+Where:\n\
+\t<name>     is optional file name -- default = \"zf1\"\n\
+\t<size_mb>  is optional size of file in megabytes [1024*1024]\n\
+\t           Default = 1MB.  Must be numeric. Max clipped at 1024M [1G]\n\
+"
+
+# =============================================================================
+# die <exit-code> <message> -- issue error message and exit w/ exit-code:
+die() {
+	declare _rc=$1; shift
+
+	echo -e "$@" >&2
+	exit $_rc
+}
+
+# =============================================================================
+# usage <exit-code> [<message>] -- issue error message if specified,
+#				 display usage message, and exit w/ exit-code
+usage()
+{
+	declare _rc=${1:-0}
+	[ -z "$*" ] || { shift; echo -e "$@" >&2; }
+	echo  -e "$USAGE"
+	exit $_rc
+}
+
+# =============================================================================
+
+declare name="zf1"
+declare -i size_mb=1
+
+[[ -z "$1" ]] || name=$1
+
+if [[ -n "$2" ]]
+then
+	size_mb=$2
+	if [[ "$2" != "0" && $size_mb -eq 0 ]]
+	then
+		usage 1 "Sorry.  <size_mb> not numeric\n"
+	fi
+fi
+
+# arbitrarily limit size to 1024MB [1GB]
+[[ "$size_mb" -gt    "0" ]] || size_mb=1
+[[ "$size_mb" -le "1024" ]] || size_mb=1024
+
+echo "name=$name; size in MB = $size_mb" >&2
+
+dd if=/dev/zero of=$name bs=1M count=$size_mb
+

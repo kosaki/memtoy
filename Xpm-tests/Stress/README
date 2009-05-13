@@ -1,0 +1,20 @@
+Poor Man's Migration Stress Test
+
+runloop is a memtoy wrapper script.  It feeds commands to memtoy in a loop
+to "stress test" memory migration.  The test scripts are simply memtoy
+scripts divided into 2 sections by a "#loop" comment.  commands before
+the #loop" comment are fed to memtoy as initialization commands--e.g., to
+define map and populate a segment.  commands after the #loop are collected
+into a shell variable array, and then fed to memtoy in a loop, the # of times
+specified by the '-l <nr_loops>' option.  
+
+For help, type runloop -h, or with no args.
+
+test-mbind-anon-1g contains a sample loop script that uses mbind+move to
+migrate just the anon segment.
+
+test-mpm-anon-1g contains a sample script that uses migrate_pages to move
+the entire test program.
+
+To really stress the system, you probably need to run a number of these
+concurrently, migrating to different sets of nodes, ...

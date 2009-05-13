@@ -1,0 +1,62 @@
+memtoy:
+
+More documentation?
+
+	more examples,  usage scenarios, ...
+
+Desired features?
+
+	+ have a race with child quitting and reusing the 
+	  same child name in batch mode [scripts].
+	  Maybe need a 'wait' command?  Or just don't do that...
+
+	+ don't allow seg names to start with a numeric val
+	  so I can give better error messages when seg name is
+	  omitted.
+		need 'get_segname()' utility fcn.
+
+	+ verify contents after migration?
+		e.g., touch <seg> {read|write}[=<value/pattern>]
+
+	+ set_mempolicy() UI
+
+	+ command to toggle verbosity?
+
+	+ echo command to echo comments for scripts
+
+	+ support cpu and memory ranges [n-m] for cpus and mems
+	  commands
+
+	+ add 'protect' command to mprotect() as a way to split vmas
+	  w/o changing mempolicy.
+
+	+ ...
+
+Done:
+	+ fancier UI [command line editing?] or not...
+		v0.6c - modified to use readline() 
+
+
+	+ multiple processes [children] sharing mappings
+		v0.4 added 'child' command and command forwarding.
+		v0.5 added child response to eliminate races
+
+	+ help summary for help w/ no args.  Details when 
+	  command specified.
+		v0.4 added cmd_longhelp member to per command struct.
+		help_me() updated to show only cmd_help on full list,
+		plus longhelp on specific command help.
+
+	+ load seg table with text/data/stack/libs/... from
+	  /proc/<mypid>/maps for manipulating same.
+		v0.6+  use show '+' to see segs from task maps
+		can mbind and touch-read, but not unmap nor
+		touch-write.
+
+	+ cpu affinity for testing default policy and migration
+
+	+ debug readline() history recall...
+		seems to work in 0.9...
+
+	+ lock/unlock segment in memory?
+		added to 0.9a

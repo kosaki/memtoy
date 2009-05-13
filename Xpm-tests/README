@@ -1,0 +1,27 @@
+Xpm-tests  -  example tests for Manual Page Migration [MPM], Direct Page
+Migration [DPM - 2.6.16 - by Christoph Lameter] and Lazy Page Migration [LPM].
+
+Lazy-old - test scripts that depend on early LPM prototype.  This prototype
+	   defined MPOL_MF_MOVE to migrate pages "lazily"--i.e., migrate on
+	   fault--and MPOL_MF_WAIT to force migration before returning from
+	   mbind().  These scripts depend on memtoy version <0.6.  Retained
+	   for reference only.
+
+Manual -   test scripts for manual page migration.  Memtoy "migrate"
+           command syntax did not change when moving from Ray Bryant's original
+           manual page migration migrate_pages() syscall to Christoph Lameter's
+           rework thereof.
+	   scripts should still work with memtoy v0.6 and later.
+
+Mbind -    old "lazy" scripts modified to work with Christoph's version of
+           mbind flags:  MOVE and MOVE_ALL.  Should work in kernels >=
+	   2.6.16 -- e.g., SLES10, RHEL5
+
+Mbind_lazy - a few Mbind scripts with "lazy" added to test migrate-on-fault.
+	   requires memtoy 0.7 or later and migrate-on-fault patches.
+
+Stress -   an attempt to wrap memtoy in a shell script to "stress test"
+	   page migration -- until I add such capability to memtoy.
+
+zerofile-* are dummy files for testing migration of memory mapped
+file segments.

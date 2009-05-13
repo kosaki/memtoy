@@ -1,0 +1,23 @@
+# memtoy test - manual migrate single 1g interleaved anon segment
+# after creating/mapping the segment, loop [via runloop script]:
+# interleave across (0,1); then migrate to (2,3)
+# migrate back to 1
+# migrate to 2, then to 3,
+# repeat...
+anon foo 1g
+map foo
+mbind foo interleaved 0,1
+touch foo w
+#loop
+# note:  migrate <to> <from>
+migrate 2,3 0,1
+touch foo r
+migrate 1 2,3
+touch foo r
+migrate 2 1
+touch foo r
+migrate 3 2
+touch foo r
+migrate 0,1 3
+touch foo r
+

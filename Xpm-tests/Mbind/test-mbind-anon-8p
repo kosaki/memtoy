@@ -1,0 +1,16 @@
+# memtoy test - migrate single 8 page anon segment
+# 
+#numa
+anon foo 8p
+map foo
+mbind foo preferred 1
+touch foo w
+where foo
+touch foo r
+#numa
+#pause
+mbind foo 0 8p bind+move 2
+# NOTE:  get_mempolicy(...,'NODE|'ADDR) will fault in
+# pages to get nodes.  Forces migration at this point
+where foo
+#numa
