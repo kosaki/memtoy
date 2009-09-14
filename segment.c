@@ -1384,3 +1384,21 @@ range_t* segment_range(char *segname, range_t *ret)
 	ret->length = seg->seg_length;
 	return ret;
 }
+
+int segment_mprotect(char *segname, int prot)
+{
+	segment_t *seg;
+	int err;
+
+	seg = segment_get(segname);
+	if (seg == NULL)
+		return SEG_ERR;
+
+	err = mprotect(seg->seg_start, seg->seg_length, prot);
+	if (err) {
+		perror("segment_mprotect ");
+		return SEG_ERR;
+	}
+	seg->seg_prot = prot;
+	return SEG_OK;
+}

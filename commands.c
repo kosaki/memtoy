@@ -2093,6 +2093,47 @@ mpol(char *args)
 	return CMD_SUCCESS;
 }
 
+static int
+mprotect_seg(char *args)
+{
+	int prot = 0;
+	char *nextarg;
+	char *segname;
+
+	args += strspn(args, whitespace);
+	if(!required_arg(args, "<seg-name>"))
+		return CMD_ERROR;
+	segname = strtok_r(args, whitespace, &nextarg);
+	args = nextarg + strspn(nextarg, whitespace);
+
+	while (*args != '\0') {
+		args = strtok_r(args, whitespace, &nextarg);
+
+		if (!strncasecmp(args, "none", strlen(args))) {
+			prot = PROT_NONE;
+			break;
+		}
+		if (!strncasecmp(args, "read", strlen(args))) {
+			prot |= PROT_READ;
+			goto next;
+		}
+		if (!strncasecmp(args, "write", strlen(args))) {
+			prot |= PROT_WRITE;
+			goto next;
+		}
+		if (!strncasecmp(args, "exec", strlen(args))) {
+			prot |= PROT_EXEC;
+			goto next;
+		}
+	next:
+		args = nextarg + strspn(nextarg, whitespace);
+	}
+
+	segment_mprotect(segname, prot);
+
+	return CMD_SUCCESS;
+}
+
 #if 0 /* new command function template */
 static int
 command(char *args)
@@ -2433,6 +2474,12 @@ struct command {
 			"\tonly the first node is used for 'preferred' policy.\n"
 			"\tIf <policy> [<node/list>] is omitted, memtoy's current task policy\n"
 			"\twill be displayed.\n",
+	},
+	{
+		.cmd_name="mprotect",
+		.cmd_func=mprotect_seg,
+		.cmd_help= "mprotect <seg-name> <prot-list>",
+		.cmd_longhelp="",
 	},
 
 #if 0 /* template for new commands */
