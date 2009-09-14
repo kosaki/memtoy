@@ -981,7 +981,7 @@ show_seg(char *args)
 }
 
 /*
- * command:  anon <seg-name> <size>[kmgp] [private|shared]
+ * command:  anon <seg-name> <size>[kmgp] [private|shared] [addr=<addr>] [offset=<segment>]
  */
 static int
 anon_seg(char *args)
@@ -1007,10 +1007,41 @@ anon_seg(char *args)
 		return CMD_ERROR;
 	args = nextarg + strspn(nextarg, whitespace);
 
-	if (*args != '\0') {
-		segflag = get_shared(args);
-		if (segflag == -1)
-			return CMD_ERROR;
+	/* optional args */
+	while (*args != '\0') {
+		char *value;
+		char *name;
+
+		args = strtok_r(args, whitespace, &nextarg);
+
+		if (!strncasecmp(args, "shared", strlen(args))) {
+			segflag = MAP_SHARED;
+			goto next;
+		}
+		if (!strncasecmp(args, "private", strlen(args))) {
+			segflag = MAP_PRIVATE;
+			goto next;
+		}
+
+		/* name=value argument */
+		name = strtok_r(args, "=", &value);
+		if (!strncasecmp(name, "addr", strlen(args))) {
+			range.offset = strtol(value, NULL, 16);
+			goto next;
+		}
+		if (!strncasecmp(name, "offset", strlen(args))) {
+			range_t segrange;
+			int err;
+
+			if (segment_range(value, &segrange) == NULL) {
+				fprintf(stderr, "offset must be existing segment\n");
+				return err;
+			}
+			range.offset = segrange.offset + segrange.length;
+			goto next;
+		}
+	next:
+		args = nextarg + strspn(nextarg, whitespace);		
 	}
 
 	if (!segment_register(SEGT_ANON, segname, &range, segflag))
@@ -2169,7 +2200,7 @@ struct command {
 		.cmd_name="anon",
 		.cmd_func=anon_seg,
 		.cmd_help=
-			"anon <seg-name> <seg-size>[k|m|g|p] [<seg-share>] -\n"
+			"anon <seg-name> <seg-size>[k|m|g|p] [<seg-share>]\n"
 			"\tdefine a MAP_ANONYMOUS segment of specified size",
 		.cmd_longhelp=
 			"\t<seg-name> must be unique.\n"

@@ -66,5 +66,6 @@ extern int segment_touch(char*, range_t*, int);
 extern int segment_mbind(char*, range_t*, int, nodemask_t*, int);
 extern int segment_location(char*, range_t*);
 extern int segment_lock_unlock(char*, range_t*, int, int);
+extern range_t* segment_range(char *segname, range_t *ret);
 
 #endif

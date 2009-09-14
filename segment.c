@@ -275,7 +275,10 @@ map_anon_segment(segment_t *segp)
 	if(!flags)
 		flags = MAP_PRIVATE;	/* default */
 
-	memp = (char *)mmap(0, segp->seg_length,
+	if (segp->seg_offset)
+		flags |= MAP_FIXED;
+
+	memp = mmap((void*)segp->seg_offset, segp->seg_length,
 	                    segp->seg_prot,
 	                    flags|MAP_ANONYMOUS,
 	                    0,              /* fd -- ignored */
@@ -1367,4 +1370,17 @@ segment_init(struct global_context *gcp)
 
 	get_task_segments(gcp);
 
+}
+
+range_t* segment_range(char *segname, range_t *ret)
+{
+	segment_t *seg;
+	
+	seg = segment_get(segname);
+	if (seg == NULL)
+		return NULL;
+
+	ret->offset = seg->seg_offset;
+	ret->length = seg->seg_length;
+	return ret;
 }
