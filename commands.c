@@ -2200,7 +2200,7 @@ struct command {
 		.cmd_name="anon",
 		.cmd_func=anon_seg,
 		.cmd_help=
-			"anon <seg-name> <seg-size>[k|m|g|p] [<seg-share>]\n"
+			"anon <seg-name> <seg-size>[k|m|g|p] [private|shared] [addr=<addr>] [offset=<segment>]\n"
 			"\tdefine a MAP_ANONYMOUS segment of specified size",
 		.cmd_longhelp=
 			"\t<seg-name> must be unique.\n"
