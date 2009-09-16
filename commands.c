@@ -484,13 +484,11 @@ get_mbind_policy(char *args, char **nextarg)
 /*
  * get_mbind_flags() - parse mbind(2) modifier flags
  *
- * format: [+shared][+move[+all][+lazy]]
- * 'shared' apply shared policy to shared file mappings. 
+ * format: [+move[+all]]
  * 'move'   specifies that currently allocated pages mapped by this process
  *          should be migrated.  => MPOL_MF_MOVE
  * 'all'    modifies 'move'.  specifies that pages be moved, even if they
  *          are mapped by more than one process/mm/vma => MPOL_MF_MOVE_ALL
- * 'lazy'   modifies 'move' or 'move'+'all'
  *
  * returns flags on success; -1 on error
  */
@@ -505,17 +503,6 @@ get_mbind_flags(char *args, char **nextarg)
 	args += strcspn(args, mbind_reject);
 
 	/*
-	 * "shared" must be first flag, if specified
-	 */
-	if (!strncmp(arg, "shared", args-arg)) {
-		flags |= MPOL_MF_SHARED;
-		if (*args !=  '+')
-			goto flags_ok;
-		arg = ++args;
-		args += strcspn(args, mbind_reject);
-	}
-
-	/*
 	 * "move" must be next flag, if any
 	 */
 	if (strncmp(arg, "move", args-arg))
@@ -524,13 +511,13 @@ get_mbind_flags(char *args, char **nextarg)
 	flags |= MPOL_MF_MOVE;
 
 	/*
-	 * look for 'all' and/or 'lazy'
+	 * look for 'all'
 	 */
 	while (*args == '+') {
 		++args;
 		if (*args == '\0' || *args == ' ') {
 			fprintf(stderr,
-				"%s:  expected 'all' or 'lazy' after '+'\n",
+				"%s:  expected 'all' after '+'\n",
 				gcp->program_name);
 			return -1;
 		}
@@ -539,9 +526,7 @@ get_mbind_flags(char *args, char **nextarg)
 		if (!strncmp(arg, "all", args-arg)) {
 			flags &= ~MPOL_MF_MOVE;
 			flags |= MPOL_MF_MOVE_ALL;
-		} else if (!strncmp(arg, "lazy", args-arg))
-			flags |= MPOL_MF_LAZY;
-		else
+		} else
 			goto flags_err;
 
 	}
@@ -555,10 +540,9 @@ flags_err:
 	/*
 	 * try to give reasonable messages, but ...
 	 */
-	move_mod = !strncmp(arg, "all", args-arg) ||
-		   !strncmp(arg, "lazy", args-arg);
+	move_mod = !strncmp(arg, "all", args-arg);
 	if (flags & MPOL_MF_MOVE) {
-			fprintf(stderr, "%s: expected 'all' or 'lazy' after "
+			fprintf(stderr, "%s: expected 'all' after "
 					"'move'\n", gcp->program_name, arg);
 	} else {
 		if (move_mod)
@@ -2365,17 +2349,13 @@ struct command {
 		.cmd_func=mbind_seg,
 		.cmd_help=
 			"mbind <seg-name> [<offset>[k|m|g|p] <length>[k|m|g|p]]\n"
-			"      <policy>[+shared][+move[+all][+lazy]] [<node/list>] - \n"
+			"      <policy>[+move[+all]] [<node/list>] - \n"
 			"\tset the numa policy for the specified range of the named segment",
 		.cmd_longhelp=
 			"\tto policy --  one of {default, bind, preferred, interleaved, noop}.\n"
 			"\t<node/list> specifies a node id or a comma separated list of\n"
 			"\tnode ids.  <node/list> is ignored for 'default' policy, and\n"
 			"\tonly the first node is used for 'preferred' policy.\n"
-			"\t'+shared' apply shared policy to shared, file mapping.  This flag must\n"
-			"\t         come before '+move', if specified.  Current uid must be owner\n"
-			"\t        of the file and shared_file_policy must be enabled in memtoy's\n"
-			"\t        cpuset.\n"
 			"\t'+move' specifies that currently allocated pages be moved, if\n"
 			"\t        necessary/possible, to satisfy policy.  Pages can't be\n"
 			"\t        moved if they are mapped by more than one process.\n"
@@ -2383,10 +2363,6 @@ struct command {
 			"\t        in task be moved to satisfy policy, even if they are\n"
 			"\t        mapped by more than one process.  Requires appropriate\n"
 			"\t        privilege.\n"
-			"\t'+lazy' [valid only with +move] requests that mbind just unmap the\n"
-			"\t        pages in the specified range after setting the new policy.\n"
-			"\t        Page migration will then occur when the task touches the pages\n"
-			"\t        to fault them back into its page table.\n"
 			"\tFor policies preferred and interleaved, <node/list> may be specified\n"
 			"\tas '*' meaning local allocation for preferred policy and \"all allowed\n"
 			"\tnodes\" for interleave policy.\n" ,

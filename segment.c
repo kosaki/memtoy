@@ -44,8 +44,6 @@
 
 #include "memtoy.h"
 #include "segment.h"
-#include "migrate_pages.h"	/* for MPOL_MF_LAZY, ... */
-
 
 struct segment {
 	char         *seg_name;
@@ -969,8 +967,6 @@ out:
 		return SEG_ERR;
 	} else  if (flags & (MPOL_MF_MOVE|MPOL_MF_MOVE_ALL)){
 		char *operation = "migration";
-		if (flags & (MPOL_MF_LAZY))
-			operation = "unmap";
 
 		printf("%s:  %s of %s [%d pages] took %6.3fsecs.\n",
 			gcp->program_name, operation, segp->seg_name,

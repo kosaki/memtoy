@@ -52,20 +52,6 @@ extern int migrate_pages(const pid_t, int, unsigned long*, unsigned long*);
 #endif
 
 /*
- * shared policy addition
- */
-#ifndef MPOL_MF_SHARED
-#define MPOL_MF_SHARED	(MPOL_MF_MOVE_ALL << 1)
-#endif
-
-/*
- * migrate-on-fault addition;  layered on shared policy
- */
-#ifndef MPOL_MF_LAZY
-#define MPOL_MF_LAZY	(MPOL_MF_SHARED << 1)
-#endif
-
-/*
  * get_mempolicy() flag -- return mems allowed
  */
 #ifndef MPOL_F_MEMS_ALLOWED
