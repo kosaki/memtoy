@@ -75,7 +75,7 @@ memtoy:  $(OBJS) $(EXTRAOBJS)
 $(OBJS):    $(HDRS)
 
 # extra dependencies to generate errors if headers are missing
-commands.o: $(HDR_DIR)/numa.h $(HDR_DIR)/numaif.h
+commands.o: $(HDR_DIR)/numa.h $(HDR_DIR)/numaif.h migrate_pages.h
 segment.o:  $(HDR_DIR)/numa.h
 
 migrate_pages.o: migrate_pages.h $(EXTRAHDRS)
